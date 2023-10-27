@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+  payload:
+    image: node:18-alpine
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/home/node/app
+      - node_modules:/home/node/app/node_modules
+    working_dir: /home/node/app/
+    command: sh -c "yarn install && yarn payload migrate && yarn dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - one_network
+
+  # connection string in .env:
+  # DATABASE_URI=postgres://postgres:postgres@postgres/payload
+  postgres:
+    image: postgres:14.1-alpine
+    restart: always
+    env_file:
+      - .env
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      # Standard port for PostgreSQL databases
+      - '5432:5432'
+    volumes:
+      # When the PostgresSQL container is started it will run any scripts
+      # provided in the `docker-entrypoint-initdb.d` directory, this connects
+      # our seed file to that directory so that it gets run
+      - ./database-seed.sql:/docker-entrypoint-initdb.d/database-seed.sql
+      - postgres:/var/lib/postgresql/data
+    networks:
+      - one_network
+
+  # PostgreSQL pgAdmin panel accessible at http://localhost:15432/
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: 'admin@admin.com'
+      PGADMIN_DEFAULT_PASSWORD: 'password'
+      PGADMIN_LISTEN_PORT: 80
+    ports:
+      - '15432:80'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - one_network
+
+  # metabase:
+  #   image: metabase/metabase:latest
+  #   ports:
+  #     - '3001:3000'
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - one_network
+
+volumes:
+  postgres:
+  pgadmin:
+  node_modules:
+
+networks:
+  one_network:
+    driver: bridge

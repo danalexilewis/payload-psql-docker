@@ -1,0 +1,4 @@
+IF DB_ID('payload') IS NULL
+BEGIN
+  CREATE DATABASE "payload";
+END
